@@ -6,6 +6,8 @@ defmodule AlivePlug do
   end
 
   def call(conn, _opts) do
+    conn = put_resp_header(conn, "Connection", "keep-alive")
+    conn = put_resp_header(conn, "Keep-Alive", "max=15, timeout=20")
     conn = send_chunked(conn, 200)
     chunk(conn, "Init")
     pid = start_thread
