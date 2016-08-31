@@ -6,31 +6,31 @@ defmodule AlivePlug do
   end
 
   def call(conn, _opts) do
-    conn = put_resp_header(conn, "Connection", "keep-alive")
-    conn = put_resp_header(conn, "Keep-Alive", "max=15, timeout=20")
     conn = send_chunked(conn, 200)
-    chunk(conn, "Init")
-    pid = start_thread
-    1..5
-    |> Enum.each(fn num -> 
-      send pid, {conn, num}
-    end)
+    chunk(conn, "Start")
 
-    # send End as a symbol of last chunk
+    core_pid = spawn_link(fn -> core_listener(conn) end)
+    thread = spawn_link(fn -> thread_listener end)
+    1..10 |> Enum.each(fn i -> send thread, {core_pid, i} end)
+
     chunk(conn, "End")
     conn
   end
 
-  defp start_thread, do: spawn_link(fn -> thread_listener end)
+  defp core_listener(conn) do
+    receive do
+      {status, i} ->
+        _conn = chunk(conn, Integer.to_string(i))
+        core_listener(conn)
+    end
+  end
+
   defp thread_listener do
     receive do
-      {conn, num} ->
-        :timer.sleep(2000)
-        #IO.inspect :timer.tc(fn -> IO.puts "hey" end)
-        {status, conn} = chunk(conn, "hey")
-        IO.inspect status
+      {core_pid, i} ->
+        send core_pid, {:ok, i}
         thread_listener
-      _ -> 
+      _ ->
         thread_listener
     end
   end
